@@ -27,7 +27,7 @@
 #	2) Fix the issue related to more than 24 ref pops in family mode
 #	3) Allow users to choose the pcs to be ploted
 #	4) Improve plot aestethics
-#
+#	5) Group subpopulations by 3rd column 
 ################################################################################
 
 if(!require(colorspace)) { install.packages("colorspace"); require(colorspace)}
