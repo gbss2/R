@@ -12,7 +12,7 @@
 # Contributor(s): John Baums (developer of iwanthue)
 # Updated by: Giordano Bruno Soares-Souza (04/09/2017)
 #
-# Command line: Rscript eigenPlot(plotMode("F"or"P"),<filename.evec>,popFile)
+# Command line: Rscript eigenPlot.r <"F"or"P"> <filename.evec> <popFile>
 # Dependencies: R, library gtools
 # Description: Plot Eigenstrat PCA plots
 # "F" = family mode
