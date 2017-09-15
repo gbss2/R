@@ -10,24 +10,34 @@
 #
 # Original Author: Giordano Bruno Soares-Souza
 # Contributor(s): John Baums (developer of iwanthue)
-# Updated by: Giordano Bruno Soares-Souza (04/09/2017)
+# Updated by: Giordano Bruno Soares-Souza (15/09/2017)
 #
-# Command line: Rscript eigenPlot.r <"F"or"P"> <filename.evec> <popFile>
+# Command line: Rscript eigenPlot.r <"F"or"P"> <filename.evec> <popFile> <filter_file>
 # Dependencies: R, library gtools
 # Description: Plot Eigenstrat PCA plots
 # "F" = family mode
 # "P" = population mode
+# <popFile> Allows user to add information about populations and groups to plot
+# Usually this information is provided in evec file unless user didn't assigned it prior to smartpca run
+# If there are many populations might be desirable to plot groups of populations with differents PCHs and
+# populations with different colours. This can be achieved assigning a popFile with 3 columns (see eg. above)
+# Currently, more than 20 populations leads to the use of different pchs for each population
+# <filter_file> Allows user to choose whose individuals to plot
 # Requirements: For pedigrees, family ids MUST BE different from Individuals IDs
-# 				For reference populations, fids MUST BE the same as individuals ids 
+# 		For reference populations, fids SHOULD BE the same as individuals ids 
 # POP FILE Format:
 #	IID1	SUBPOP1	POP1 (last column is optional)
 #	IID2	SUBPOP2	POP2 
+# Filter file Format:
+#	IID1
+#	IID2
 # Future Developments:
 # 	1) Add option to use external file to assign individuals to pedigrees
 #	2) Fix the issue related to more than 24 ref pops in family mode
-#	3) Allow users to choose the pcs to be ploted
+#	3) Allow users to choose the pcs to be ploted 
 #	4) Improve plot aestethics
-#	5) Group subpopulations by 3rd column 
+# 	5) GetArgs ?
+#	6) Allow user to deactivate multiple pchs when ploting more than 20 populations
 ################################################################################
 
 if(!require(colorspace)) { install.packages("colorspace"); require(colorspace)}
@@ -125,6 +135,7 @@ args = commandArgs(trailingOnly=TRUE)
 plotMode = args[1]
 filename = args[2]
 popfile = args[3]
+excludefile = args[4]
 
 # Retrive Eigenvalues and Eigenvectors from evec file (Unix based)
 system(paste0("head -n 1 ",filename," | sed -r 's/^\\s+//g' | sed -r 's/\\s+/\t/g' | sed -r 's/\\#//g' > ",filename,".head.tmp"), intern=TRUE)
@@ -133,8 +144,16 @@ writeLines("Reading EVEC file")
 eigVal = read.table(paste0(filename,".head.tmp"),head=F,as.is=T)
 evec = read.table(paste0(filename,".body.tmp"),head=F,as.is=T)
 
+# IF individuals filter plot is present
+
+if(!is.null(excludefile)){
+ind2plot = read.table(excludefile,head=F,as.is=T)
+evec = evec[evec$V2 %in% as.vector(ind2plot[,1]), ]
+}
+
 # IF popfile is present
 writeLines("Reading POP file")
+
 
 if(!is.null(popfile)){
 
@@ -194,24 +213,28 @@ if(plotMode=="P"){
 
 	inds = match(as.vector(evec[,ncol(evec)]),pops)
 	colorPops = iwanthue(length(pops))
+	col2legend = colorPops
 	colorPlot = colorPops[inds]
 	
 	# IF POPFILE HAS 3 columns PCHs = 3rd column and Colors = 2nd column
 	if(dim(filePOP)[2]==3){
 		indsCon = match(as.vector(cont),conts)
-		pchs = c(15,16,17,18,25,8,3,4,20,11,9,13,7,12,14)
+		pchs = c(15,16,17,18,8,3,4,25,20,11,9,13,7,12,14)
 		pchPops = rep(pchs,len=length(conts))
 		pchPlot = pchPops[indsCon]
-		pops2legend = pops
-		pch2legend = as.numeric(unique(cbind(evec[,ncol(evec)],cont,pchPlot))[,3])
+		pch2order = unique(cbind(evec[,ncol(evec)],cont,pchPlot,colorPlot))
+#		print(dim(pch2order))
+		pch2legend = as.numeric(pch2order[order(pch2order[,3]),3])
+		col2legend = pch2order[order(pch2order[,3]),4]
+		pops2legend = pch2order[order(pch2order[,3]),1]
 		sink("pchs.txt")
 		print(pchPlot)
 		print(colorPlot)
 		sink()
 	
 	} else {
-		# IF POPFILE HAS MORE THAN 15 POPULATIONS, USE DISTINCT PCHS TO DIFERENTIATE
-		if(length(pops)>15){
+		# IF POPFILE HAS MORE THAN 20 POPULATIONS, USE DISTINCT PCHS TO DIFFERENTIATE
+		if(length(pops)>20){
 			pchs = c(15,16,17,18,25,8,3,4,20,11,9,13,7,12,14)
 			pchPops = rep(pchs,len=length(pops))
 			pchPlot = pchPops[inds]
@@ -233,17 +256,21 @@ if(plotMode=="P"){
 	#print(colorPops)
 	print(dim(evec))
 	cexAdjust=1-(length(pops2legend)/100)
+#	insetAdjust=-0.25-(length(pops2legend)*0.0005)
+	insetAdjust = -0.25
 
-		for (i in 4: (dim(evec)[2]-1)){
-			eigX = eigVal[2]/sum(eigVal)
+	for (j in 3: (dim(evec)[2]-1)){
+		for (i in 4: (dim(evec)[2]-1)) {
+			eigX = eigVal[j-1]/sum(eigVal)
 			eigY = eigVal[(i-1)]/sum(eigVal)
 	#		print(eig)
 	#		print(eig[[1]])
-			plot(evec[,3],evec[,i],xlab="",ylab="",col=colorPlot,pch=pchPlot )
-			title(ylab=paste0("PC ",i-2," - Var explained = ",round(eigY[[1]],3)),xlab=paste0("PC 1 - Var explained = ",round(eigX[[1]],3)), line=2, cex.lab=1)
-			legend("topright",inset=c(-0.35,0),legend=pops2legend,pch=pch2legend,col=colorPops,bty = "n",cex=cexAdjust,pt.cex=cexAdjust)
-			print(i)
+			plot(evec[,j],evec[,i],xlab="",ylab="",col=colorPlot,pch=pchPlot,cex.axis=0.5 )
+			title(ylab=paste0("PC ",i-2," - Var explained = ",round(eigY[[1]],3)),xlab=paste0("PC ",j-2," - Var explained = ",round(eigX[[1]],3)), line=2, cex.lab=1)
+			legend("right",inset=c(insetAdjust,0),legend=pops2legend,pch=pch2legend,col=col2legend,bty = "n",cex=cexAdjust,pt.cex=cexAdjust)
+		#	print(i)
 		}
+	}
 
 }
 
